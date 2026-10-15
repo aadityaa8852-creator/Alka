@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: alka_ivf
+      POSTGRES_USER: alka
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-replace-this-local-password}
+    volumes:
+      - alka_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alka -d alka_ivf"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://alka:${POSTGRES_PASSWORD:-replace-this-local-password}@db:5432/alka_ivf
+      JWT_SECRET: ${JWT_SECRET:-replace-this-with-a-long-random-secret-before-deployment}
+      JWT_TTL_HOURS: 8
+      FRONTEND_ORIGINS: http://localhost:8080
+      APP_ENV: development
+    ports: ["8000:8000"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8000/api/v1
+    ports: ["8080:80"]
+    depends_on: [api]
+    restart: unless-stopped
+volumes:
+  alka_postgres:
